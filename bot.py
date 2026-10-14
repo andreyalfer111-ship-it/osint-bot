@@ -3,12 +3,29 @@ import sqlite3
 import telebot
 import requests
 import re
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("Не найден токен бота!")
 
 bot = telebot.TeleBot(TOKEN)
+
+# Мини-сервер для удовлетворения требований Render к открытым портам
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OSINT Bot is active and running!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# Запускаем веб-сервер в фоновом потоке, чтобы Render не выдавал ошибку таймаута порта
+threading.Thread(target=run_web_server, daemon=True).start()
 
 # Инициализация базы данных SQLite для истории запросов
 def init_db():
@@ -225,7 +242,7 @@ def process_domain_search(message):
         text = f"🌐 **Домен:** `{domain}`\n• Статус: `{r.status_code}`\n• Сервер: `{server}`\n• Cloudflare: {cloudflare}"
         bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=get_back_markup())
     except Exception:
-        bot.send_message(message.chat.id, "❌ Домен недоступен.", reply_markup=get_back_markup())
+        bot.send_message(message.chat.id, f"❌ Домен недоступен.", reply_markup=get_back_markup())
 
 @bot.message_handler(content_types=['photo', 'video', 'video_note', 'contact', 'document'])
 def handle_media(message):
