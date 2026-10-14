@@ -162,15 +162,12 @@ def process_web_search(message):
     
     status_msg = bot.send_message(message.chat.id, f"🌐 Ищу упоминания `{query}` в открытых источниках...")
     
-    # Используем публичный поисковый шлюз для анализа упоминаний
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        # Запрос через открытый API поиска DuckDuckGo Lite
         res = requests.get(f"https://lite.duckduckgo.com/lite/", data={"q": query}, headers=headers, timeout=6)
         
         report = [f"🌐 **Результаты поиска упоминаний:** `{query}`\n"]
         if res.status_code == 200:
-            # Парсим базовые ссылки из выдачи лит-версии
             matches = re.findall(r'class="result-link".*?href="(.*?)".*?>(.*?)</a>', res.text)
             if matches:
                 report.append("• **Найденные открытые страницы:**")
@@ -218,17 +215,21 @@ def process_domain_search(message):
     try:
         r = requests.get(f"https://{domain}", timeout=5, allow_redirects=True)
         server = r.headers.get('Server', 'Не определен')
+        
+        # Исправлено: убрана лишняя буква 'B'
+        cloudflare_status = 'Активна 🛡️' if 'cloudflare' in server.lower() else 'Нет'
+        
         text = (
             f"🌐 **Отчет по домену:** `{domain}`\n\n"
             f"• Статус код: `{r.status_code}`\n"
             f"• Веб-сервер: `{server}`\n"
-            f"• Защита Cloudflare: {'Активна 🛡️' B if 'cloudflare' in server.lower() else 'Нет'}"
+            f"• Защита Cloudflare: {cloudflare_status}"
         )
         bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=get_back_markup())
     except Exception:
         bot.send_message(message.chat.id, f"❌ Домен `{domain}` недоступен.", reply_markup=get_back_markup())
 
-# 5. Инспектор медиа и пересылок (работает автоматически в режиме инспектора)
+# 5. Инспектор медиа и пересылок
 @bot.message_handler(content_types=['photo', 'video', 'video_note', 'contact', 'document'])
 def handle_media(message):
     report = ["🔍 **Анализ объекта (Инспектор):**\n"]
